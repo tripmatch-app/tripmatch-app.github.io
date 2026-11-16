@@ -233,6 +233,12 @@
   var API_BASE = "https://tripmatch-api.tripmatch-app.workers.dev";
   var TOKEN_KEY = "tripmatch-session";
 
+  // Demo mode: with ?demo this page reads from the in-browser copy of the
+  // worker and its sample data (demo/demo.js), signed in as the demo admin.
+  var DEMO = /[?&]demo(=|&|$)/.test(location.search);
+  var demoToken = null;
+  var apiFetch = function (url, init) { return fetch(url, init); };
+
   function escapeHtml(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
@@ -247,6 +253,7 @@
   }
 
   function token() {
+    if (DEMO) return demoToken;
     try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
   }
 
@@ -265,7 +272,7 @@
 
     var res;
     try {
-      res = await fetch(API_BASE + path, {
+      res = await apiFetch(API_BASE + path, {
         headers: { Authorization: "Bearer " + t },
         cache: "no-store"
       });
@@ -339,6 +346,29 @@
     }
     if (action === "feedback.create") {
       return '<span class="fb-kind-tag">' + escapeHtml(d.kind) + '</span> ' + escapeHtml(d.preview || "");
+    }
+    // Seat claims and +1s: who was joined, and for how many people.
+    var people = function (n) { return n + (n === 1 ? " person" : " people"); };
+    if (action === "seat.claim") {
+      return escapeHtml(d.party + " of " + d.seats + " seat" + (d.seats === 1 ? "" : "s") + " in " + d.driver + "'s car");
+    }
+    if (action === "seat.release") {
+      return escapeHtml("gave back " + d.party + " seat" + (d.party === 1 ? "" : "s") + " in " + d.driver + "'s car");
+    }
+    if (action === "seat.claim.full") {
+      return escapeHtml("asked for " + d.wanted + ", " + d.free + " free in " + d.driver + "'s car");
+    }
+    if (action === "plusone.add") {
+      return escapeHtml("also going with " + d.rider + " · " + people(d.party || 1));
+    }
+    if (action === "plusone.remove") {
+      return escapeHtml("no longer going with " + (d.driver || d.rider || "this trip"));
+    }
+    if (action === "login" && d.via) {
+      return escapeHtml("via " + d.via);
+    }
+    if (action === "login.rejected") {
+      return escapeHtml(String(d.reason || "").replace(/_/g, " ") + (d.via ? " · via " + d.via : ""));
     }
     if (action === "migration.import") {
       return escapeHtml(d.posts + " posts, " + d.comments + " comments, " + d.plusOnes + " +1s from " + d.source);
@@ -507,7 +537,7 @@
     btn.textContent = "Preparing…";
     try {
       var params = new URLSearchParams({ format: "csv", limit: "5000" });
-      var res = await fetch(API_BASE + "/api/logs?" + params.toString(), {
+      var res = await apiFetch(API_BASE + "/api/logs?" + params.toString(), {
         headers: { Authorization: "Bearer " + token() }
       });
       if (!res.ok) throw new Error("http " + res.status);
@@ -526,7 +556,22 @@
     btn.textContent = "Download CSV";
   });
 
-  load();
+  if (DEMO) {
+    notice("info", "Starting the demo…");
+    import("./demo/demo.js")
+      .then(function (mod) { return mod.boot({ page: "logs" }); })
+      .then(function (d) {
+        apiFetch = d.fetch;
+        demoToken = d.session.token;
+        load();
+      })
+      .catch(function (e) {
+        console.error("TripMatch: demo failed to start", e);
+        notice("error", "The demo couldn't start in this browser. Try a current version of Chrome, Safari or Firefox.");
+      });
+  } else {
+    load();
+  }
 })();
 </script>
 </body>
