@@ -4,6 +4,8 @@ A shared rides board for the Haas community — post a trip, see who else is goi
 
 **Live app:** https://tripmatch-app.github.io/
 
+**Demo, no sign-in needed:** https://tripmatch-app.github.io/demo/ — the same app and the same API code, running in your browser against sample data. See [demo/README.md](demo/README.md).
+
 ## What it does
 
 Anyone with a Berkeley account can post a trip — offering seats or looking for a ride — with a route, date, and time. The board groups posts by route and date, and once several dates are active a row of date chips lets you jump straight to one day instead of scrolling. Nothing to install: open the link, sign in with the Google account behind your bMail, and you're on the board.
@@ -46,6 +48,8 @@ This replaced a JSONBin setup that shipped an API key in the page source and rew
 | `worker/worker.js` | The API |
 | `worker/schema.sql` | Database schema |
 | `worker/test/api.test.mjs` | 168 checks against the real worker and real SQL |
+| `worker/test/demo-seed.test.mjs` | 21 checks that the demo's sample data fits the schema and the worker |
+| `demo/` | Demo mode — the worker running in the browser on sample data |
 | `scripts/migrate-jsonbin-to-d1.mjs` | One-shot import from the old board |
 | `DEPLOY.md` | Step-by-step deploy runbook |
 | `INFRASTRUCTURE.md` | Architecture, scalability analysis, known limits |

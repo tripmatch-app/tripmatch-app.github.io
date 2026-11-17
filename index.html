@@ -1120,8 +1120,21 @@
   var GOOGLE_CLIENT_ID = "463078890652-qm9j13cicdrla2rlguqg847e4aru2umr.apps.googleusercontent.com";
   var ALLOWED_DOMAIN = "berkeley.edu";
 
-  var TOKEN_KEY = "tripmatch-session";
-  var USER_KEY = "tripmatch-user";
+  // ---- demo mode --------------------------------------------------------
+  //
+  // With ?demo in the address (or via /demo/), this page talks to a copy of
+  // the worker running inside the browser against sample data, instead of to
+  // API_BASE — see demo/demo.js. Nothing below this block knows the
+  // difference: requests go through apiFetch either way. The demo keeps its
+  // session under separate keys so trying it never signs anyone out of the
+  // real board, or the other way round.
+
+  var DEMO = /[?&]demo(=|&|$)/.test(location.search);
+  var demo = null;
+  var apiFetch = function (url, init) { return fetch(url, init); };
+
+  var TOKEN_KEY = DEMO ? "tripmatch-demo-session" : "tripmatch-session";
+  var USER_KEY = DEMO ? "tripmatch-demo-user" : "tripmatch-user";
 
   function configured() {
     return API_BASE.indexOf("REPLACE_WITH") === -1 && GOOGLE_CLIENT_ID.indexOf("REPLACE_WITH") === -1;
@@ -1298,7 +1311,7 @@
 
     var res;
     try {
-      res = await fetch(API_BASE + path, {
+      res = await apiFetch(API_BASE + path, {
         method: options.method || "GET",
         headers: headers,
         body: options.body ? JSON.stringify(options.body) : undefined,
@@ -1614,6 +1627,11 @@
     var target = document.getElementById("gsiButton");
     var fallback = document.getElementById("authFallback");
 
+    if (DEMO) {
+      if (demo) demo.mountGate(target, fallback);
+      return;
+    }
+
     if (!configured()) {
       fallback.textContent = "This deployment isn't configured yet — API_BASE and GOOGLE_CLIENT_ID still need to be filled in near the top of index.html.";
       return;
@@ -1745,6 +1763,30 @@
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden && session.token) refresh();
     });
+
+    if (DEMO) {
+      try {
+        var mod = await import("./demo/demo.js");
+        demo = await mod.boot({
+          page: "board",
+          onSession: function (s) {
+            storeSession(s.token, s.user);
+            banner.clear();
+            showApp();
+            return start();
+          }
+        });
+      } catch (e) {
+        console.error("TripMatch: demo failed to start", e);
+        showGate("The demo couldn't start in this browser. Try a current version of Chrome, Safari or Firefox.");
+        return;
+      }
+      apiFetch = demo.fetch;
+      storeSession(demo.session.token, demo.session.user);
+      showApp();
+      await start();
+      return;
+    }
 
     if (!configured()) {
       showGate();
